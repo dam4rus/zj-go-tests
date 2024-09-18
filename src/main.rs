@@ -95,7 +95,8 @@ impl ZellijPlugin for GoTestsPlugin {
     fn update(&mut self, event: Event) -> bool {
         match &mut self.logs_screen {
             Some(logs_screen) => match logs_screen.update(event) {
-                Some(logs_screen::UpdateResult::ExitScreen) => {
+                Some(logs_screen::UpdateCommand::Render) => true,
+                Some(logs_screen::UpdateCommand::ExitScreen) => {
                     self.logs_screen = None;
                     true
                 }

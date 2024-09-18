@@ -21,6 +21,8 @@ pub(crate) struct TestsScreen {
     selected_index: usize,
     scroll_x: usize,
     scroll_y: usize,
+    screen_width: Option<usize>,
+    screen_height: Option<usize>,
     result_filters: ResultFilters,
 }
 
@@ -44,6 +46,21 @@ impl TestsScreen {
             }
             Event::Key(Key::Right | Key::Char('l')) => {
                 self.scroll_x = (self.scroll_x + 1).min(1);
+                Some(UpdateCommand::Render)
+            }
+            Event::Key(Key::PageDown | Key::Char('d')) => {
+                if let Some(height) = self.screen_height {
+                    self.selected_index = self
+                        .selected_index
+                        .saturating_add(height / 2)
+                        .min(self.visible_list_items().len().saturating_sub(1));
+                }
+                Some(UpdateCommand::Render)
+            }
+            Event::Key(Key::PageUp | Key::Char('u')) => {
+                if let Some(height) = self.screen_height {
+                    self.selected_index = self.selected_index.saturating_sub(height / 2);
+                }
                 Some(UpdateCommand::Render)
             }
             Event::Key(Key::Char('\n')) => {
@@ -73,6 +90,8 @@ impl TestsScreen {
     }
 
     pub(crate) fn render(&mut self, rows: usize, cols: usize) {
+        self.screen_width = Some(cols);
+        self.screen_height = Some(rows);
         let bottom_index = self.scroll_y + rows - 2;
         if self.selected_index > bottom_index {
             self.scroll_y = self
@@ -106,6 +125,7 @@ impl TestsScreen {
                 }
             });
         print_table_with_coordinates(table, 0, 0, Some(cols), Some(rows));
+
         let pass_ribbon = Text::new("[1] pass");
         let fail_ribbon = Text::new("[2] fail");
         let skip_ribbon = Text::new("[3] skip");
