@@ -1,6 +1,6 @@
 use zellij_tile::prelude::*;
 
-use crate::{logs_screen::LogsScreen, Package, TestCase};
+use crate::{logs_screen::LogsScreen, Package, TestCase, TestResult};
 
 #[derive(Debug)]
 pub(crate) enum UpdateCommand {
@@ -12,7 +12,7 @@ pub(crate) enum UpdateCommand {
 pub(crate) struct TestsScreen {
     pub(crate) packages: Vec<Package>,
     selected_index: usize,
-    selected_index_changed: bool,
+    scroll_x: usize,
     scroll_y: usize,
 }
 
@@ -24,12 +24,18 @@ impl TestsScreen {
                     .selected_index
                     .saturating_add(1)
                     .min(self.test_count().saturating_sub(1));
-                self.selected_index_changed = true;
                 Some(UpdateCommand::Render)
             }
             Event::Key(Key::Up | Key::Char('k')) => {
                 self.selected_index = self.selected_index.saturating_sub(1);
-                self.selected_index_changed = true;
+                Some(UpdateCommand::Render)
+            }
+            Event::Key(Key::Left | Key::Char('h')) => {
+                self.scroll_x = self.scroll_x.saturating_sub(1);
+                Some(UpdateCommand::Render)
+            }
+            Event::Key(Key::Right | Key::Char('l')) => {
+                self.scroll_x = (self.scroll_x + 1).min(3);
                 Some(UpdateCommand::Render)
             }
             Event::Key(Key::Char('\n')) => {
@@ -59,7 +65,8 @@ impl TestsScreen {
         }
 
         let table_rows = self.build_table_rows();
-        let table = Table::new().add_row(vec!["package", "test", "result", "elapsed"]);
+        let headers = ["package", "result", "elapsed"];
+        let table = Table::new().add_row(Vec::from(&headers[self.scroll_x..]));
 
         let table = table_rows
             .into_iter()
@@ -70,11 +77,12 @@ impl TestsScreen {
                 if i == self.selected_index {
                     acc.add_styled_row(
                         row.into_iter()
+                            .skip(self.scroll_x)
                             .map(|column| Text::new(column).selected())
                             .collect(),
                     )
                 } else {
-                    acc.add_row(row)
+                    acc.add_row(row.into_iter().skip(self.scroll_x).collect())
                 }
             });
         print_table_with_coordinates(table, 0, 0, Some(cols), Some(rows));
@@ -90,7 +98,6 @@ impl TestsScreen {
         self.packages.iter().fold(Vec::new(), |mut acc, package| {
             let mut row = Vec::new();
             row.push(package.name.clone());
-            row.push(String::from(" "));
             row.push(
                 package
                     .result
@@ -105,10 +112,19 @@ impl TestsScreen {
                     .unwrap_or(String::from(" ")),
             );
             acc.push(row);
-            for test in &package.tests {
+            for (i, test) in package.tests.iter().enumerate() {
                 let mut row = Vec::new();
-                row.push(package.name.clone());
-                row.push(test.name.clone());
+                let border = if i < package.tests.len() - 1 {
+                    '├'
+                } else {
+                    '└'
+                };
+                let result = match test.result {
+                    Some(TestResult::Pass) => '✅',
+                    Some(TestResult::Fail) => '❎',
+                    Some(TestResult::Skip) | None => ' ',
+                };
+                row.push(format!("{} {} {}", border, result, test.name));
                 row.push(
                     test.result
                         .as_ref()
