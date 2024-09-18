@@ -64,13 +64,22 @@ struct TestLine {
     elapsed: Option<f64>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 struct Package {
     name: String,
     result: Option<TestResult>,
     elapsed: Option<f64>,
     tests: Vec<TestCase>,
     log: Vec<String>,
+}
+
+impl Package {
+    pub fn new<T: Into<String>>(name: T) -> Self {
+        Self {
+            name: name.into(),
+            ..Self::default()
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -118,15 +127,23 @@ impl ZellijPlugin for GoTestsPlugin {
             let line: TestLine =
                 serde_json::from_str(&payload).expect("Failed to deserialize Go test line json");
             match line.action {
-                Some(Action::Start) => self.tests_screen.packages.push(Package {
-                    name: line
-                        .package
-                        .expect("Expected name for package in `Start` action"),
-                    result: None,
-                    tests: Vec::new(),
-                    log: Vec::new(),
-                    elapsed: None,
-                }),
+                Some(Action::Start) => {
+                    let new_package = Package::new(
+                        line.package
+                            .expect("Expected name for package in `Start` action"),
+                    );
+
+                    if let Some(package) = self
+                        .tests_screen
+                        .packages
+                        .iter_mut()
+                        .find(|package| package.name == new_package.name)
+                    {
+                        *package = new_package;
+                    } else {
+                        self.tests_screen.packages.push(new_package);
+                    }
+                }
                 Some(action @ (Action::Skip | Action::Pass | Action::Fail)) => {
                     if let Some(package) = self.tests_screen.packages.iter_mut().find(|package| {
                         package.name
