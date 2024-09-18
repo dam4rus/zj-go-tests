@@ -19,12 +19,23 @@ enum Action {
     Skip,
 }
 
-#[derive(Debug, Clone, Copy, AsRefStr)]
+#[derive(Debug, Clone, Copy, AsRefStr, Default, PartialEq, Eq, PartialOrd, Ord)]
 #[strum(serialize_all = "lowercase")]
 enum TestResult {
-    Pass,
-    Fail,
+    #[default]
     Skip,
+    Fail,
+    Pass,
+}
+
+impl TestResult {
+    pub fn marker_color_and_char(&self) -> (usize, char) {
+        match self {
+            TestResult::Pass => (2, 'P'),
+            TestResult::Fail => (0, 'F'),
+            TestResult::Skip => (1, '?'),
+        }
+    }
 }
 
 impl TryFrom<Action> for TestResult {
