@@ -59,7 +59,7 @@ impl TestsScreen {
         }
 
         let table_rows = self.build_table_rows();
-        let table = Table::new().add_row(vec!["package", "test", "result"]);
+        let table = Table::new().add_row(vec!["package", "test", "result", "elapsed"]);
 
         let table = table_rows
             .into_iter()
@@ -86,28 +86,39 @@ impl TestsScreen {
             .fold(0, |acc, package| acc + 1 + package.tests.len())
     }
 
-    fn build_table_rows(&self) -> Vec<Vec<&str>> {
+    fn build_table_rows(&self) -> Vec<Vec<String>> {
         self.packages.iter().fold(Vec::new(), |mut acc, package| {
             let mut row = Vec::new();
-            row.push(package.name.as_str());
-            row.push(" ");
+            row.push(package.name.clone());
+            row.push(String::from(" "));
             row.push(
                 package
                     .result
                     .as_ref()
-                    .map(|result| result.as_ref())
-                    .unwrap_or(" "),
+                    .map(|result| String::from(result.as_ref()))
+                    .unwrap_or(String::from(" ")),
+            );
+            row.push(
+                package
+                    .elapsed
+                    .map(|elapsed| format!("{}s", elapsed))
+                    .unwrap_or(String::from(" ")),
             );
             acc.push(row);
             for test in &package.tests {
                 let mut row = Vec::new();
-                row.push(package.name.as_str());
-                row.push(test.name.as_str());
+                row.push(package.name.clone());
+                row.push(test.name.clone());
                 row.push(
                     test.result
                         .as_ref()
-                        .map(|result| result.as_ref())
-                        .unwrap_or(" "),
+                        .map(|result| String::from(result.as_ref()))
+                        .unwrap_or(String::from(" ")),
+                );
+                row.push(
+                    test.elapsed
+                        .map(|elapsed| format!("{}s", elapsed))
+                        .unwrap_or(String::from(" ")),
                 );
                 acc.push(row);
             }

@@ -50,12 +50,14 @@ struct TestLine {
     package: Option<String>,
     test: Option<String>,
     output: Option<String>,
+    elapsed: Option<f64>,
 }
 
 #[derive(Debug, Clone)]
 struct Package {
     name: String,
     result: Option<TestResult>,
+    elapsed: Option<f64>,
     tests: Vec<TestCase>,
     log: Vec<String>,
 }
@@ -64,6 +66,7 @@ struct Package {
 struct TestCase {
     name: String,
     result: Option<TestResult>,
+    elapsed: Option<f64>,
     log: Vec<String>,
 }
 
@@ -110,6 +113,7 @@ impl ZellijPlugin for GoTestsPlugin {
                     result: None,
                     tests: Vec::new(),
                     log: Vec::new(),
+                    elapsed: None,
                 }),
                 Some(action @ (Action::Skip | Action::Pass | Action::Fail)) => {
                     if let Some(package) = self.tests_screen.packages.iter_mut().find(|package| {
@@ -124,9 +128,11 @@ impl ZellijPlugin for GoTestsPlugin {
                             .iter_mut()
                             .find(|test| line.test.as_deref() == Some(&test.name))
                         {
-                            test.result = Some(action.try_into().unwrap())
+                            test.result = Some(action.try_into().unwrap());
+                            test.elapsed = line.elapsed;
                         } else {
                             package.result = Some(action.try_into().unwrap());
+                            package.elapsed = line.elapsed;
                         }
                     }
                 }
@@ -142,6 +148,7 @@ impl ZellijPlugin for GoTestsPlugin {
                             name: line.test.expect("Expected test name"),
                             result: None,
                             log: Vec::new(),
+                            elapsed: None,
                         });
                     }
                 }
