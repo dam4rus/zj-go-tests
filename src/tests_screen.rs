@@ -29,26 +29,41 @@ pub(crate) struct TestsScreen {
 impl TestsScreen {
     pub(crate) fn update(&mut self, event: Event) -> Option<UpdateCommand> {
         match event {
-            Event::Key(Key::Down | Key::Char('j')) => {
+            Event::Key(KeyWithModifier {
+                bare_key: BareKey::Down | BareKey::Char('j'),
+                ..
+            }) => {
                 self.selected_index = self
                     .selected_index
                     .saturating_add(1)
                     .min(self.visible_list_items().len().saturating_sub(1));
                 Some(UpdateCommand::Render)
             }
-            Event::Key(Key::Up | Key::Char('k')) => {
+            Event::Key(KeyWithModifier {
+                bare_key: BareKey::Up | BareKey::Char('k'),
+                ..
+            }) => {
                 self.selected_index = self.selected_index.saturating_sub(1);
                 Some(UpdateCommand::Render)
             }
-            Event::Key(Key::Left | Key::Char('h')) => {
+            Event::Key(KeyWithModifier {
+                bare_key: BareKey::Left | BareKey::Char('h'),
+                ..
+            }) => {
                 self.scroll_x = self.scroll_x.saturating_sub(1);
                 Some(UpdateCommand::Render)
             }
-            Event::Key(Key::Right | Key::Char('l')) => {
+            Event::Key(KeyWithModifier {
+                bare_key: BareKey::Right | BareKey::Char('l'),
+                ..
+            }) => {
                 self.scroll_x = (self.scroll_x + 1).min(1);
                 Some(UpdateCommand::Render)
             }
-            Event::Key(Key::PageDown | Key::Char('d')) => {
+            Event::Key(KeyWithModifier {
+                bare_key: BareKey::PageDown | BareKey::Char('d'),
+                ..
+            }) => {
                 if let Some(height) = self.screen_height {
                     self.selected_index = self
                         .selected_index
@@ -57,31 +72,66 @@ impl TestsScreen {
                 }
                 Some(UpdateCommand::Render)
             }
-            Event::Key(Key::PageUp | Key::Char('u')) => {
+            Event::Key(KeyWithModifier {
+                bare_key: BareKey::PageUp | BareKey::Char('u'),
+                ..
+            }) => {
                 if let Some(height) = self.screen_height {
                     self.selected_index = self.selected_index.saturating_sub(height / 2);
                 }
                 Some(UpdateCommand::Render)
             }
-            Event::Key(Key::Char('\n')) => {
-                self.visible_list_items()
-                    .get(self.selected_index)
-                    .map(|list_item| {
-                        UpdateCommand::ShowLogsScreen(match list_item {
-                            ListItem::Package(package) => LogsScreen::new(package.log.clone()),
-                            ListItem::TestCase(test_case) => LogsScreen::new(test_case.log.clone()),
-                        })
-                    })
+            Event::Key(KeyWithModifier {
+                bare_key: BareKey::Char('f'),
+                ..
+            }) => {
+                if let Some(height) = self.screen_height {
+                    self.selected_index = self
+                        .selected_index
+                        .saturating_add(height)
+                        .min(self.visible_list_items().len().saturating_sub(1));
+                }
+                Some(UpdateCommand::Render)
             }
-            Event::Key(Key::Char('1')) => {
+            Event::Key(KeyWithModifier {
+                bare_key: BareKey::Char('b'),
+                ..
+            }) => {
+                if let Some(height) = self.screen_height {
+                    self.selected_index = self.selected_index.saturating_sub(height);
+                }
+                Some(UpdateCommand::Render)
+            }
+            Event::Key(KeyWithModifier {
+                bare_key: BareKey::Enter,
+                ..
+            }) => self
+                .visible_list_items()
+                .get(self.selected_index)
+                .map(|list_item| {
+                    UpdateCommand::ShowLogsScreen(match list_item {
+                        ListItem::Package(package) => LogsScreen::new(package.log.clone()),
+                        ListItem::TestCase(test_case) => LogsScreen::new(test_case.log.clone()),
+                    })
+                }),
+            Event::Key(KeyWithModifier {
+                bare_key: BareKey::Char('1'),
+                ..
+            }) => {
                 self.result_filters.pass = !self.result_filters.pass;
                 Some(UpdateCommand::Render)
             }
-            Event::Key(Key::Char('2')) => {
+            Event::Key(KeyWithModifier {
+                bare_key: BareKey::Char('2'),
+                ..
+            }) => {
                 self.result_filters.fail = !self.result_filters.fail;
                 Some(UpdateCommand::Render)
             }
-            Event::Key(Key::Char('3')) => {
+            Event::Key(KeyWithModifier {
+                bare_key: BareKey::Char('3'),
+                ..
+            }) => {
                 self.result_filters.skip = !self.result_filters.skip;
                 Some(UpdateCommand::Render)
             }
@@ -91,8 +141,8 @@ impl TestsScreen {
 
     pub(crate) fn render(&mut self, rows: usize, cols: usize) {
         self.screen_width = Some(cols);
-        self.screen_height = Some(rows);
-        let bottom_index = self.scroll_y + rows - 2;
+        self.screen_height = Some(rows - 3);
+        let bottom_index = self.scroll_y + self.screen_height.unwrap();
         if self.selected_index > bottom_index {
             self.scroll_y = self
                 .scroll_y
@@ -233,11 +283,13 @@ impl<'a> ListItem<'a> {
         let mut row = Vec::new();
         match self {
             ListItem::Package(package) => {
-                let (color, result) = package
-                    .result
-                    .unwrap_or(TestResult::Skip)
-                    .marker_color_and_char();
-                row.push(Text::new(format!("{} {}", result, package.name)).color_range(color, ..1));
+                let test_result = package.result.unwrap_or(TestResult::Skip);
+                let marker_color = test_result.marker_color();
+                let marker_char = test_result.marker_char();
+                row.push(
+                    Text::new(format!("{} {}", marker_char, package.name))
+                        .color_range(marker_color, ..1),
+                );
                 row.push(
                     package
                         .elapsed
@@ -247,13 +299,12 @@ impl<'a> ListItem<'a> {
             }
             ListItem::TestCase(test_case) => {
                 let border = if is_last_element { '└' } else { '├' };
-                let (color, result) = test_case
-                    .result
-                    .unwrap_or(TestResult::Skip)
-                    .marker_color_and_char();
+                let test_result = test_case.result.unwrap_or(TestResult::Skip);
+                let marker_color = test_result.marker_color();
+                let marker_char = test_result.marker_char();
                 row.push(
-                    Text::new(format!("{} {} {}", border, result, test_case.name))
-                        .color_range(color, 2..3),
+                    Text::new(format!("{} {} {}", border, marker_char, test_case.name))
+                        .color_range(marker_color, 2..3),
                 );
                 row.push(
                     test_case

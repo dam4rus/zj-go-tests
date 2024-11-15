@@ -29,11 +29,19 @@ enum TestResult {
 }
 
 impl TestResult {
-    pub fn marker_color_and_char(&self) -> (usize, char) {
+    pub fn marker_color(&self) -> usize {
         match self {
-            TestResult::Pass => (2, 'P'),
-            TestResult::Fail => (0, 'F'),
-            TestResult::Skip => (1, '?'),
+            TestResult::Pass => 2,
+            TestResult::Fail => 0,
+            TestResult::Skip => 1,
+        }
+    }
+
+    pub fn marker_char(&self) -> char {
+        match self {
+            TestResult::Pass => 'P',
+            TestResult::Fail => 'F',
+            TestResult::Skip => '?',
         }
     }
 }
